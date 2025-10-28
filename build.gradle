@@ -1,0 +1,85 @@
+plugins {
+    id 'java'
+}
+
+group 'eee.eie4108'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    junitVersion = '5.13.2'
+}
+
+sourceCompatibility = '21'
+targetCompatibility = '21'
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+dependencies {
+    compileOnly('jakarta.platform:jakarta.jakartaee-core-api:11.0.0')
+    implementation("org.glassfish.jersey.containers:jersey-container-jetty-http:4.0.0-M4")
+    implementation('org.glassfish.jersey.containers:jersey-container-servlet:4.0.0-M4')
+    implementation('org.glassfish.jersey.media:jersey-media-json-jackson:4.0.0-M4')
+    implementation('org.glassfish.jersey.inject:jersey-hk2:4.0.0-M4')
+    implementation('org.glassfish.jersey.core:jersey-client:4.0.0-M4')
+    implementation('org.apache.commons:commons-lang3:3.19.0')
+    implementation("org.slf4j:slf4j-jdk14:2.0.17")
+    implementation("org.projectlombok:lombok:1.18.42")
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('serverJar', Jar) {
+    // Define the main class for the executable JAR
+    manifest {
+        attributes 'Main-Class': 'eee.eie4108.exampleraft.MainApp'
+    }
+    archiveFileName.set("raft-node.jar")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Include all runtime and compile dependencies within the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
+}
+
+tasks.register('serverV2Jar', Jar) {
+    // Define the main class for the executable JAR
+    manifest {
+        attributes 'Main-Class': 'eee.eie4108.exampleraft.MainAppV2'
+    }
+    archiveFileName.set('raft-node-v2.jar')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Include all runtime and compile dependencies within the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
+}
+
+tasks.register('clientJar', Jar) {
+    // Define the main class for the executable JAR
+    manifest {
+        attributes 'Main-Class': 'eee.eie4108.exampleraft.RaftClient'
+    }
+    archiveFileName.set('raft-client.jar')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Include all runtime and compile dependencies within the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
+}
