@@ -313,7 +313,7 @@ public class RaftNodeV2 {
     // Total number of nodes = peerUrls.size() + 1 (self)
     int totalNodes = peerUrls.size() + 1;
     int majority = (totalNodes / 2) + 1;
-    System.out.printf("Node %s get %d/%d votes from peer%n", nodeId, votesReceived + 1, totalNodes);
+    System.out.printf("Node %s get %d/%d votes from peer%n", nodeId, votesReceived, totalNodes);
     if (state == NodeState.CANDIDATE && votesReceived >= majority) {
       becomeLeader();
     }
