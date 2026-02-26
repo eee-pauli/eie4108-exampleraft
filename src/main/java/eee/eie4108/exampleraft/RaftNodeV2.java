@@ -335,40 +335,36 @@ public class RaftNodeV2 {
         int next = nextIndex.get(peerUrl);
         int lastLogIdx = getLastLogIndex();
         
-        if (lastLogIdx >= next) {
-          // Need to send new entries
-          int prevLogIndex = next - 1;
-          int prevLogTerm = log.get(prevLogIndex).getTerm();
-          // Send all entries from nextIndex to the end of the log
-          List<LogEntry> entriesToSend = new ArrayList<>(log.subList(next, lastLogIdx + 1));
-          
-          // System.out.printf("Leader %s replicating %d entries to %s (nextIndex=%d)%n", nodeId, entriesToSend.size(), peerUrl, next);
-          
-          AppendEntriesRequestV2 request = new AppendEntriesRequestV2(currentTerm, nodeId, prevLogIndex, prevLogTerm, entriesToSend, commitIndex);
-          WebTarget target = client.target(peerUrl).path("/node/appendEntries");
-          Response response = target.request(MediaType.APPLICATION_JSON).post(Entity.json(request));
-          
-          if (response.getStatus() == 200) {
-            AppendEntriesResponse r = response.readEntity(AppendEntriesResponse.class);
-            if (r.isSuccess()) {
-              // Replication was successful
-              nextIndex.put(peerUrl, lastLogIdx + 1);
-              matchIndex.put(peerUrl, lastLogIdx);
-            } else {
-              // Follower's log was inconsistent. Backtrack.
-              if (r.getTerm() > currentTerm) {
-                stepDown(r.getTerm()); // Found a new leader/term
-                return;
-              }
-              System.out.printf("Leader %s: Peer %s rejected logs. Backtracking nextIndex.%n", nodeId, peerUrl);
-              nextIndex.put(peerUrl, Math.max(1, next - 1)); // Decrement and retry
+        // Calculate prevLogIndex based on this specific follower's progress
+        int prevLogIndex = next - 1;
+        int prevLogTerm = log.get(prevLogIndex).getTerm();
+        
+        // If we have logs to send, send them; otherwise, it's an empty heartbeat
+        List<LogEntry> entriesToSend = (lastLogIdx >= next)
+                                           ? new ArrayList<>(log.subList(next, lastLogIdx + 1))
+                                           : Collections.emptyList();
+        
+        AppendEntriesRequestV2 request = new AppendEntriesRequestV2(currentTerm, nodeId, prevLogIndex, prevLogTerm, entriesToSend, commitIndex);
+        WebTarget target = client.target(peerUrl).path("/node/appendEntries");
+        
+        // IMPORTANT: Process the response even for heartbeats
+        Response response = target.request(MediaType.APPLICATION_JSON).post(Entity.json(request));
+        
+        if (response.getStatus() == 200) {
+          AppendEntriesResponse r = response.readEntity(AppendEntriesResponse.class);
+          if (r.isSuccess()) {
+            // Success: node is now up to at least the index we sent
+            nextIndex.put(peerUrl, Math.max(next, lastLogIdx + 1));
+            matchIndex.put(peerUrl, Math.max(matchIndex.get(peerUrl), lastLogIdx));
+          } else {
+            if (r.getTerm() > currentTerm) {
+              stepDown(r.getTerm());
+              return;
             }
+            // Consistency check failed: decrement nextIndex and try again in next interval
+            System.out.printf("Leader %s: Peer %s rejected index %d. Backtracking.%n", nodeId, peerUrl, prevLogIndex);
+            nextIndex.put(peerUrl, Math.max(1, next - 1));
           }
-        } else {
-          // Log is up-to-date, send a heartbeat (empty entries list)
-          AppendEntriesRequestV2 heartbeat = new AppendEntriesRequestV2(currentTerm, nodeId, lastLogIdx, getLastLogTerm(), Collections.emptyList(), commitIndex);
-          WebTarget target = client.target(peerUrl).path("/node/appendEntries");
-          target.request(MediaType.APPLICATION_JSON).post(Entity.json(heartbeat));
         }
       } catch (Exception e) {
         // System.err.printf("Leader %s failed to replicate to %s: %s%n", nodeId, peerUrl, e.getMessage());
