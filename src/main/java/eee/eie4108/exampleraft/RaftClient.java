@@ -102,7 +102,7 @@ public class RaftClient {
         if (response.getStatus() == Response.Status.OK.getStatusCode()) {
           // We use Map.class to easily deserialize the simple JSON object
           Map<String, String> responseData = response.readEntity(new GenericType<Map<String, String>>() {});
-          System.out.printf("Repiled: %s = %s%n", responseData.get("key"), responseData.get("value"));
+          System.out.printf("Replied: %s = %s%n", responseData.get("key"), responseData.get("value"));
           return; // Done
         } else if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
           System.out.println("Key not found.");
